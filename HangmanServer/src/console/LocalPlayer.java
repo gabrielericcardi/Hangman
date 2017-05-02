@@ -9,7 +9,16 @@ package console;
 
 import hangman.Player;
 import hangman.Game;
+import hangman.GameResult;
+import java.io.BufferedReader;
 import java.io.Console;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Manage a player playing with the terminal.
@@ -19,16 +28,25 @@ import java.io.Console;
 public class LocalPlayer extends Player {
     
     Console console;
-        
+    Socket socket;
+    PrintWriter pw = null;    
+    
     /**
      * Constructor.
      */
-    public LocalPlayer() {
+    public LocalPlayer(Socket socket) {
         console = System.console();
+        this.socket=socket;
+        
     }
     
     @Override
-    public void update(Game game) {
+    public void update(Game game,Socket socket) {
+        try {
+            pw = new PrintWriter(socket.getOutputStream(), true);
+        } catch (IOException ex) {
+            Logger.getLogger(LocalPlayer.class.getName()).log(Level.SEVERE, null, ex);
+        }
         switch(game.getResult()) {
             case FAILED:
                 printBanner("Hai perso!  La parola da indovinare era '" +
@@ -36,8 +54,18 @@ public class LocalPlayer extends Player {
                 break;
             case SOLVED:
                 printBanner("Hai indovinato!   (" + game.getSecretWord() + ")");
+                pw.println("bravo");
+        {
+            try {
+                socket.close();
+            } catch (IOException ex) {
+                Logger.getLogger(LocalPlayer.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
                 break;
             case OPEN:
+                pw.println(gameRepresentation(game));
+                
                 int rem = Game.MAX_FAILED_ATTEMPTS - game.countFailedAttempts();
                 System.out.print("\n" + rem + " tentativi rimasti\n");
                 System.out.println(this.gameRepresentation(game));
@@ -78,14 +106,28 @@ public class LocalPlayer extends Player {
      */
     @Override
     public char chooseLetter(Game game) {
+        
         for (;;) {
-            System.out.print("Inserisci una lettera: ");
-            String line = console.readLine().trim();
-            if (line.length() == 1 && Character.isLetter(line.charAt(0))) {
-                return line.charAt(0);
-            } else {
+            
+            try {
+                BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                String line = br.readLine();
+                if (line.length() == 1 && Character.isLetter(line.charAt(0))) {
+                    if(game.getResult()==GameResult.SOLVED){
+                    pw.println("bravo");
+                    }
+                    return line.charAt(0);
+                } else {
                 System.out.println("Lettera non valida.");
+                }
+                
+            } catch (IOException ex) {
+                Logger.getLogger(LocalPlayer.class.getName()).log(Level.SEVERE, null, ex);
             }
+            
+//            System.out.print("Inserisci una lettera: ");
+//            String line = console.readLine().trim();
+            
         }
     }
 }
